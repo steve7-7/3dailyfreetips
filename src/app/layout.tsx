@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import { Toaster } from "@/components/toaster";
 import "./globals.css";
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: {
     default: "GoalEdge — Smarter Football Predictions",
     template: "%s | GoalEdge",
@@ -18,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    url: appUrl,
     title: "GoalEdge — Smarter Football Predictions",
     description: "Data-driven football predictions with real odds and in-depth analysis.",
     siteName: "GoalEdge",
@@ -32,7 +37,7 @@ export const metadata: Metadata = {
     images: ["/logo.png"],
   },
   alternates: {
-    canonical: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    canonical: appUrl,
   },
   icons: {
     icon: "/favicon.png",
