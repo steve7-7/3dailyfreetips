@@ -53,6 +53,37 @@ npm run dev
 | premium@goaledge.com | password123 | Premium User |
 | free@goaledge.com | password123 | Free User |
 
+## ▲ Deploying to Vercel
+
+The app needs a **reachable PostgreSQL database** (there is no `localhost` Postgres on
+Vercel — without one, every database-backed page returns HTTP 500). Supabase works out
+of the box:
+
+1. **Create a Supabase project** (or reuse an existing one) at https://supabase.com.
+2. **Push the schema** to it from your machine:
+   ```bash
+   DATABASE_URL="postgres://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require" npx drizzle-kit push
+   ```
+   Optional demo data: `DATABASE_URL="..." npx tsx src/db/seed.ts`
+   (skip this in production, or change the demo passwords afterwards).
+3. **Set environment variables** in Vercel → Project → Settings → Environment Variables:
+   | Variable | Value |
+   |----------|-------|
+   | `DATABASE_URL` | Supabase **pooled** connection string (`...pooler.supabase.com:6543/...?sslmode=require&pgbouncer=true`, from Database → Connect → Connection pooling). Pooled = required on serverless. |
+   | `JWT_SECRET` | Long random string (`openssl rand -base64 48`). No default is safe for production. |
+   | `NEXT_PUBLIC_APP_URL` | `https://<your-app>.vercel.app` (used for sitemap, OG tags, Paystack callbacks). |
+   | `PAYSTACK_SECRET_KEY` | Only for live payments; omit for mock mode. |
+   >
+   > If you connect Supabase via Vercel Storage Integrations instead, the app also
+   > accepts the auto-provided `POSTGRES_PRISMA_URL` / `POSTGRES_URL` variables —
+   > no extra config needed.
+4. **Redeploy**, then verify: `https://<your-app>.vercel.app/api/health` should return
+   `{"ok":true,"database":{"connected":true},...}`.
+
+> ⚠️ Never commit `.env` / `.env.local` — they are git-ignored. If secrets were ever
+> committed, rotate them (Supabase Dashboard → Project Settings) and purge them from
+> git history.
+
 ## 🔧 Configuration
 
 ### Required Environment Variables

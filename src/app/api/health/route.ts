@@ -1,4 +1,3 @@
-import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -14,8 +13,15 @@ function getErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function isMissingConfig(error: unknown): boolean {
+  return error instanceof Error && /DATABASE_URL is required/.test(error.message);
+}
+
 export async function GET() {
   try {
+    // Dynamic import so a missing DATABASE_URL is reported as JSON instead
+    // of crashing the route module at load time.
+    const { db } = await import("@/db");
     await db.execute(sql`select 1`);
     return Response.json({
       ok: true,
@@ -24,10 +30,15 @@ export async function GET() {
       service: "goaledge",
     });
   } catch (error) {
+    const missingConfig = isMissingConfig(error);
     return Response.json(
       {
         ok: false,
-        database: { connected: false, errorCode: getErrorCode(error) ?? "UNKNOWN" },
+        database: {
+          connected: false,
+          configured: !missingConfig,
+          errorCode: missingConfig ? "NOT_CONFIGURED" : (getErrorCode(error) ?? "UNKNOWN"),
+        },
         supabase: isSupabaseConfigured(),
         service: "goaledge",
       },

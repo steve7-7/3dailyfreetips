@@ -12,8 +12,9 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
-import { getStats, listPredictions } from "@/lib/queries";
+import type { SafeUser } from "@/db/schema";
+import type { DashboardStats } from "@/lib/queries";
+import type { ClientPrediction } from "@/lib/types";
 import { PLANS, type PlanId } from "@/lib/constants";
 import { formatNaira } from "@/lib/utils";
 import { PredictionCard } from "@/components/prediction-card";
@@ -44,12 +45,43 @@ const FEATURES = [
   },
 ];
 
+const EMPTY_STATS: DashboardStats = {
+  total: 0,
+  upcoming: 0,
+  won: 0,
+  lost: 0,
+  settled: 0,
+  winRate: 0,
+  premium: 0,
+};
+
+async function getLandingData(): Promise<{
+  user: SafeUser | null;
+  stats: DashboardStats;
+  featured: ClientPrediction[];
+}> {
+  try {
+    // Dynamic imports so a missing/unreachable database degrades this public
+    // marketing page instead of crashing it (a static import would throw at
+    // module load when DATABASE_URL is not configured).
+    const [{ getCurrentUser }, { getStats, listPredictions }] = await Promise.all([
+      import("@/lib/auth"),
+      import("@/lib/queries"),
+    ]);
+    const [user, stats, featured] = await Promise.all([
+      getCurrentUser(),
+      getStats(),
+      listPredictions({ status: "upcoming" }, false, 3),
+    ]);
+    return { user, stats, featured };
+  } catch (error) {
+    console.error("Landing page: database unavailable, rendering defaults.", error);
+    return { user: null, stats: EMPTY_STATS, featured: [] };
+  }
+}
+
 export default async function LandingPage() {
-  const user = await getCurrentUser();
-  const [stats, featured] = await Promise.all([
-    getStats(),
-    listPredictions({ status: "upcoming" }, false, 3),
-  ]);
+  const { user, stats, featured } = await getLandingData();
 
   const dashboardHref = user ? "/dashboard" : "/register";
 

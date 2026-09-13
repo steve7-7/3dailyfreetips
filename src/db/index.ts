@@ -4,8 +4,32 @@ import { join } from "node:path";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
+function cleanConnectionString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  // Tolerate values pasted with surrounding quotes (e.g. from dashboards).
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
 function getDatabaseUrl(): string | undefined {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  // Vercel's Postgres/Supabase integrations auto-provide POSTGRES_* variables
+  // (no DATABASE_URL), so accept those as fallbacks for zero-config deploys.
+  // POSTGRES_PRISMA_URL is the pooled connection string — preferred on serverless.
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL,
+  ];
+  for (const candidate of candidates) {
+    const cleaned = cleanConnectionString(candidate);
+    if (cleaned) return cleaned;
+  }
 
   // Backward compatibility for older local .env files that contained only the
   // connection string on the first line instead of DATABASE_URL=...
@@ -25,7 +49,10 @@ function getDatabaseUrl(): string | undefined {
 const databaseUrl = getDatabaseUrl();
 
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required. Add it to .env.local or your deployment environment.");
+  throw new Error(
+    "DATABASE_URL is required (POSTGRES_PRISMA_URL / POSTGRES_URL are also accepted). " +
+      "Add it to .env.local or your deployment environment.",
+  );
 }
 
 function shouldUseSsl(connectionString: string): boolean {
